@@ -14,16 +14,16 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'centros-publicos-madrid' title`, () => {
+  it(`should have the 'configuracion-app' title`, () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
-    expect(app.title).toEqual('centros-publicos-madrid');
+    expect(app.title).toEqual('configuracion-app');
   });
 
   it('should render title', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, centros-publicos-madrid');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, configuracion-app');
   });
 });

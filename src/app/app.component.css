@@ -1,0 +1,57 @@
+/* app.component.css */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  font-family: Arial, sans-serif;
+}
+
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+td:first-child {
+  font-weight: bold;
+}
+
+ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+li {
+  cursor: pointer;
+  padding: 5px;
+  margin: 5px 0;
+  background-color: #f2f2f2;
+  border: 1px solid #ddd;
+}
+
+li.selected {
+  background-color: #d2d2d2;
+  font-weight: bold;
+}
+
+input[type="text"] {
+  margin-top: 20px;
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
