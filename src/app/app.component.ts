@@ -111,8 +111,14 @@ export class AppComponent {
 
   itemsPerPage = 10;
   currentPage = 1;
+  registroSeleccionado: any;
+
 
   pageChanged(event: number) {
     this.currentPage = event;
+  }
+  selectRow(row: any) {
+    this.registroSeleccionado = row;
+    console.log('Registro seleccionado:', row);
   }
 }
