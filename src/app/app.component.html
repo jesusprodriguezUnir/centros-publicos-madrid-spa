@@ -24,8 +24,15 @@
     <tbody *ngIf="filteredData && filteredData.length > 1">
       <tr *ngFor="let row of filteredData.slice(1) | paginate: { itemsPerPage: itemsPerPage, currentPage: currentPage }">
         <td *ngFor="let cell of row">{{ cell }}</td>
+        <td>
+          <button class="btn-seleccionar" (click)="selectRow(row)">Seleccionar</button> <!-- Botón de selección -->
+        </td>
       </tr>
     </tbody>
   </table>
   <pagination-controls (pageChange)="pageChanged($event)"></pagination-controls>
+</div>
+<div *ngIf="registroSeleccionado">
+  <h2>Registro Seleccionado</h2>
+  <p *ngFor="let cell of registroSeleccionado">{{ cell }}</p>
 </div>
