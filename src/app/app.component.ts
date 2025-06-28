@@ -1,124 +1,253 @@
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { NgxPaginationModule } from 'ngx-pagination';
-import * as XLSX from 'xlsx';
+import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
 
-// Define las interfaces aquí
-interface EnvironmentConfig {
-  key: string;
-  value: string;
-}
-
-interface Application {
-  name: string;
-  environments: {
-    development: EnvironmentConfig[];
-    preproduction: EnvironmentConfig[];
-    test: EnvironmentConfig[];
-    production: EnvironmentConfig[];
-  };
-}
+import { ExcelService } from './services/excel.service';
+import { FileUploadComponent } from './components/file-upload/file-upload.component';
+import { SheetSelectorComponent } from './components/sheet-selector/sheet-selector.component';
+import { DataTableComponent } from './components/data-table/data-table.component';
+import { RecordDetailsComponent } from './components/record-details/record-details.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, CommonModule, NgxPaginationModule],
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.css']
+  imports: [
+    CommonModule,
+    MatToolbarModule,
+    MatIconModule,
+    MatButtonModule,
+    MatSidenavModule,
+    MatSnackBarModule,
+    FileUploadComponent,
+    SheetSelectorComponent,
+    DataTableComponent,
+    RecordDetailsComponent
+  ],
+  template: `
+    <div class="app-container">
+      <!-- Header -->
+      <mat-toolbar color="primary" class="app-header">
+        <mat-icon>table_chart</mat-icon>
+        <span>{{ title }}</span>
+        
+        <span class="spacer"></span>
+        
+        @if (excelService.workbook()) {
+          <button mat-icon-button (click)="resetApp()" matTooltip="Cargar nuevo archivo">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        }
+      </mat-toolbar>
+
+      <!-- Main Content -->
+      <div class="app-content">
+        @if (!excelService.workbook()) {
+          <!-- File Upload Section -->
+          <div class="upload-section">
+            <app-file-upload (fileSelected)="onFileSelected($event)"></app-file-upload>
+          </div>
+        } @else {
+          <!-- Data Management Section -->
+          <mat-sidenav-container class="data-container">
+            <!-- Main Data View -->
+            <mat-sidenav-content class="main-content">
+              <!-- Sheet Selector -->
+              <app-sheet-selector
+                [sheets]="excelService.workbook()!.sheets"
+                [selectedIndex]="excelService.workbook()!.selectedSheetIndex"
+                (sheetChanged)="onSheetChanged($event)">
+              </app-sheet-selector>
+
+              <!-- Data Table -->
+              @if (excelService.currentSheet()) {
+                <app-data-table
+                  [data]="excelService.filteredData()"
+                  [headers]="excelService.currentSheet()!.headers"
+                  [selectedRecord]="excelService.selectedRecord()?.data || null"
+                  (recordSelected)="onRecordSelected($event)"
+                  (exportData)="onExportData()">
+                </app-data-table>
+              }
+            </mat-sidenav-content>
+
+            <!-- Side Panel for Record Details -->
+            <mat-sidenav 
+              mode="side" 
+              position="end" 
+              [opened]="sidenavOpen()"
+              class="record-sidenav">
+              <div class="sidenav-header">
+                <h3>Detalles del Registro</h3>
+                <button mat-icon-button (click)="toggleSidenav()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+              
+              <div class="sidenav-content">
+                <app-record-details [record]="excelService.selectedRecord()">
+                </app-record-details>
+              </div>
+            </mat-sidenav>
+          </mat-sidenav-container>
+        }
+      </div>
+    </div>
+  `,
+  styles: [`
+    .app-container {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .app-header mat-icon {
+      margin-right: 0.5rem;
+    }
+
+    .spacer {
+      flex: 1 1 auto;
+    }
+
+    .app-content {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .upload-section {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #fafafa;
+    }
+
+    .data-container {
+      height: 100%;
+    }
+
+    .main-content {
+      padding: 1rem;
+      overflow: auto;
+    }
+
+    .record-sidenav {
+      width: 400px;
+      border-left: 1px solid #e0e0e0;
+    }
+
+    .sidenav-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      border-bottom: 1px solid #e0e0e0;
+      background-color: #f5f5f5;
+    }
+
+    .sidenav-header h3 {
+      margin: 0;
+      color: #333;
+    }
+
+    .sidenav-content {
+      padding: 1rem;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      .record-sidenav {
+        width: 100%;
+      }
+      
+      .main-content {
+        padding: 0.5rem;
+      }
+    }
+  `]
 })
 export class AppComponent {
-  title = 'configuracion-app';
-  applications: Application[] = [];
-  excelData: any[] = []; // Variable para almacenar los datos del Excel
-  filteredData: any[] = []; // Variable para almacenar los datos filtrados
-  sheetNames: string[] = []; // Variable para almacenar los nombres de las hojas
-  selectedSheet: string = ''; // Variable para almacenar la hoja seleccionada
-  filterText: string = ''; // Variable para almacenar el texto del filtro
-  workbook: XLSX.WorkBook | null = null; // Variable para almacenar el workbook
+  title = 'Configuración App - Excel Viewer';
+  
+  excelService = inject(ExcelService);
+  snackBar = inject(MatSnackBar);
+  
+  sidenavOpen = signal(false);
+  isLoading = signal(false);
 
-  // Método para manejar el evento de cambio de archivo
-  onFileChange(event: any): void {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e: any) => {
-        const data = new Uint8Array(e.target.result);
-        this.workbook = XLSX.read(data, { type: 'array' });
-        this.sheetNames = this.workbook.SheetNames;
-        this.selectedSheet = this.sheetNames[0];
-        this.loadSheetData(this.selectedSheet);
-      };
-      reader.readAsArrayBuffer(file);
+  async onFileSelected(file: File): Promise<void> {
+    this.isLoading.set(true);
+    
+    try {
+      await this.excelService.loadExcelFile(file);
+      this.snackBar.open('Archivo cargado exitosamente', 'Cerrar', {
+        duration: 3000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    } catch (error) {
+      console.error('Error loading file:', error);
+      this.snackBar.open('Error al cargar el archivo', 'Cerrar', {
+        duration: 5000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    } finally {
+      this.isLoading.set(false);
     }
   }
 
-  // Método para cargar los datos de una hoja específica
-  loadSheetData(sheetName: string): void {
-    if (this.workbook) {
-      const worksheet = this.workbook.Sheets[sheetName];
-      this.excelData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-      this.applyFilter();
+  onSheetChanged(index: number): void {
+    this.excelService.selectSheet(index);
+    this.sidenavOpen.set(false); // Close sidenav when changing sheets
+  }
+
+  onRecordSelected(event: { data: any; index: number }): void {
+    this.excelService.selectRecord(event.data, event.index);
+    this.sidenavOpen.set(true);
+  }
+
+  onExportData(): void {
+    try {
+      this.excelService.exportFilteredData('xlsx');
+      this.snackBar.open('Datos exportados exitosamente', 'Cerrar', {
+        duration: 3000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      this.snackBar.open('Error al exportar los datos', 'Cerrar', {
+        duration: 5000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
     }
   }
 
-  // Método para cambiar la hoja seleccionada
-  selectSheet(sheetName: string): void {
-    this.selectedSheet = sheetName;
-    this.loadSheetData(sheetName);
+  toggleSidenav(): void {
+    this.sidenavOpen.set(!this.sidenavOpen());
   }
 
-  // Método para aplicar el filtro a los datos
-  applyFilter(): void {
-    if (this.filterText) {
-      this.filteredData = this.excelData.filter(row =>
-        row.some((cell: any) => cell.toString().toLowerCase().includes(this.filterText.toLowerCase()))
-      );
-    } else {
-      this.filteredData = this.excelData;
-    }
-  }
-
-  // Método para manejar el cambio en el texto del filtro
-  onFilterTextChange(event: any): void {
-    this.filterText = event.target.value;
-    this.applyFilter();
-  }
-
-  // Añade el método toggleEnv aquí
-  toggleEnv(appName: string, env: string): void {
-    const app = this.applications.find(application => application.name === appName);
-    if (app) {
-      const envConfig = app.environments[env as keyof typeof app.environments];
-      if (envConfig) {
-        envConfig.forEach(config => {
-          config.value = config.value === 'visible' ? 'hidden' : 'visible';
-        });
-      }
-    }
-  }
-
-  isEnvVisible(appName: string, env: string): boolean {
-    const app = this.applications.find(application => application.name === appName);
-    if (app) {
-      const envConfig = app.environments[env as keyof typeof app.environments];
-      if (envConfig) {
-        return envConfig.some(config => config.value === 'visible');
-      }
-    }
-    return false;
-  }
-
-  itemsPerPage = 10;
-  currentPage = 1;
-  registroSeleccionado: any;
-
-
-  pageChanged(event: number) {
-    this.currentPage = event;
-  }
-  selectRow(row: any) {
-    this.registroSeleccionado = row;
-    console.log('Registro seleccionado:', row);
+  resetApp(): void {
+    this.excelService.workbook.set(null);
+    this.excelService.selectedRecord.set(null);
+    this.sidenavOpen.set(false);
+    
+    this.snackBar.open('Aplicación reiniciada', 'Cerrar', {
+      duration: 2000,
+      horizontalPosition: 'end',
+      verticalPosition: 'top'
+    });
   }
 }
